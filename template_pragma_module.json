@@ -1,5 +1,5 @@
 {
-    "name": "Project Name",
-    "module_name": "pr_module",
-    "install_directory": "modules/"
+    "name": "DaVinci Resolve Bridge",
+    "module_name": "pr_davinci",
+    "install_directory": "modules/pr_davinci/"
 }
