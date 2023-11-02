@@ -43,7 +43,7 @@ namespace davinci {
 	};
 };
 
-static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, const std::string &projectFileName)
+static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, const std::string &projectFileName, const std::string audioMapJson)
 {
 	if(!install_pragma_davinci_module(nw))
 		return davinci::DaVinciErrorCode::FailedToInstallPFMModule;
@@ -65,7 +65,8 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 	filemanager::create_directory("temp");
 	// We need to convert the UDM project data to JSON, so we can load it in the davinci script
 	std::string jsonFilePath = "temp/davinci_target_project.json";
-	if(!filemanager::write_file(jsonFilePath, ssJson.str()))
+	std::string jsonFilePathAudioMap = "temp/davinci_target_project_audio_map.json";
+	if(!filemanager::write_file(jsonFilePath, ssJson.str()) || !filemanager::write_file(jsonFilePathAudioMap, audioMapJson))
 		return davinci::DaVinciErrorCode::FailedToWriteTempJsonProject;
 	// util::ScopeGuard sgJson {[&jsonFilePath]() { filemanager::remove_file(jsonFilePath); }};
 
@@ -88,15 +89,18 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 	ss << "local pragmaInstallPath = \"" << programPath << "\"\n";
 	ss << "local projectFile = \"" << projectFileName << "\"\n";
 	ss << "local jsonProjectFilePath = \"" << jsonFilePath << "\"\n";
+	ss << "local jsonAudioMapFilePath = \"" << jsonFilePathAudioMap << "\"\n";
 	ss << "print(\"pragmaInstallPath: \", pragmaInstallPath)\n";
 	ss << "print(\"projectFile: \", projectFile)\n";
 	ss << "print(\"jsonProjectFilePath: \", jsonProjectFilePath)\n";
-	ss << "local res, errMsg = pfm.import_project(\"" << programPath << "\", \"" << jsonFilePath << "\")\n";
+	ss << "print(\"jsonAudioMapFilePath: \", jsonAudioMapFilePath)\n";
+	ss << "local res, errMsg = pfm.import_project(\"" << programPath << "\", \"" << jsonFilePath << "\", \"" << jsonFilePathAudioMap << "\")\n";
 	ss << "if(res == false) then\n";
 	ss << "\tprint(\"Failed to import PFM project: \", errMsg)\n";
 	ss << "end\n";
 	ss << "os.remove(\"" << scriptFileLocation << "\")\n";
 	ss << "os.remove(\"" << (util::Path::CreatePath(util::get_program_path()) + jsonFilePath).GetString() << "\")\n";
+	ss << "os.remove(\"" << (util::Path::CreatePath(util::get_program_path()) + jsonFilePathAudioMap).GetString() << "\")\n";
 	f->WriteString(ss.str());
 	f = nullptr;
 	return davinci::DaVinciErrorCode::Success;

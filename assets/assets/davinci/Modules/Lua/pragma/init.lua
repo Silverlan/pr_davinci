@@ -23,7 +23,7 @@ local function dump(o)
 	end
 end
 
-local function import_audio(project, jsonData)
+local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 	local audioItems = {}
 	local session = jsonData["session"]
 	for _, clip in ipairs(session["clips"]) do
@@ -42,18 +42,28 @@ local function import_audio(project, jsonData)
 					local timeFrame = (audioClip ~= nil) and audioClip["timeFrame"] or nil
 					if sound ~= nil and timeFrame ~= nil then
 						local soundName = sound["soundName"]
+						soundName = soundName:gsub("\\", "/")
+						print("soundName: ", soundName)
 
 						local start = timeFrame["start"]
 						local duration = timeFrame["duration"]
+						local pitch = sound["pitch"]
+						local volume = sound["volume"]
+						-- TODO: Can we apply pitch and volume somehow?
 
-						local audioPath = "E:/projects/pragma/build/install/addons/imported/sounds/" -- TODO
-						local audioItem = project:GetMediaPool():ImportMedia(audioPath .. soundName)
-						if audioItem[1] ~= nil then
-							table.insert(audioItems, {
-								audioItem = audioItem[1],
-								start = start,
-								duration = duration,
-							})
+						local soundPath = jsonAudioMapData[soundName]
+						if soundPath ~= nil then
+							print("Importing audio file '" .. soundPath .. "'!")
+							local audioItem = project:GetMediaPool():ImportMedia(pragmaRootPath .. soundPath)
+							if audioItem[1] ~= nil then
+								table.insert(audioItems, {
+									audioItem = audioItem[1],
+									start = start,
+									duration = duration,
+								})
+							end
+						else
+							print("Failed to import sound file '" .. soundName .. "'!")
 						end
 					end
 				end
@@ -76,11 +86,8 @@ local function import_frames(project)
 	return project:GetMediaPool():ImportMedia(tFrames)
 end
 
-local function import_project(pragmaRootPath, jsonFilePath)
+local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath)
 	print("Importing PFM project...")
-
-	pragmaRootPath = "E:/projects/pragma/build/install/"
-	jsonFilePath = "addons/filmmaker/projects/test_audio.json"
 
 	local jsonData
 	local function get_json_value(...)
@@ -100,19 +107,27 @@ local function import_project(pragmaRootPath, jsonFilePath)
 		return false, "Failed to create project!"
 	end
 
-	local fullJsonPath = pragmaRootPath .. jsonFilePath
-	local frameRate = 24
-	local f = io.open(fullJsonPath, "r")
-	if f == nil then
-		return false, "Failed to open JSON project file '" .. fullJsonPath .. "'!"
-	end
-	local contents = f:read("*a")
-	f:close()
+	local function read_json_path(jsonFilePath)
+		local fullJsonPath = pragmaRootPath .. jsonFilePath
+		local f = io.open(fullJsonPath, "r")
+		if f == nil then
+			return false, "Failed to open JSON project file '" .. fullJsonPath .. "'!"
+		end
+		local contents = f:read("*a")
+		f:close()
 
-	jsonData = json.parse(contents)
+		return json.parse(contents)
+	end
+
+	jsonData = read_json_path(jsonFilePath)
+	local jsonAudioMapData = read_json_path(jsonAudioMapFilePath)
+	if jsonData == nil or jsonAudioMapData == nil then
+		return
+	end
 
 	local renderSettings = get_json_value("session", "settings", "renderSettings") or {}
 
+	local frameRate = 24
 	frameRate = renderSettings["frameRate"] or frameRate
 	project:SetSetting("timelineFrameRate", tostring(frameRate))
 
@@ -135,7 +150,7 @@ local function import_project(pragmaRootPath, jsonFilePath)
 		return false, "Failed to create timeline!"
 	end
 
-	local audioItems = import_audio(project, jsonData)
+	local audioItems = import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 	for _, itemData in ipairs(audioItems) do
 		local startFrame = time_to_frame(itemData.start)
 		project:GetMediaPool():AppendToTimeline({
