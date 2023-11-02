@@ -44,9 +44,14 @@ jobs:
       - name: Create Release Files
         shell: bash
         run: |
-          mkdir -p release/${{ steps.module-info.outputs.install_directory }}
-          cp "${{ steps.build-module.outputs.install-dir }}/modules/${{ steps.module-info.outputs.module_name }}.dll" "release/${{ steps.module-info.outputs.install_directory }}"
-
+          if [ -n "${{ steps.module-info.outputs.release_directory }}" ]; then
+            mkdir -p "release/${{ steps.module-info.outputs.release_directory }}"
+            cp -a "${{ steps.build-module.outputs.install-dir }}/${{ steps.module-info.outputs.release_directory }}." "release/${{ steps.module-info.outputs.release_directory }}"
+          else
+            mkdir -p "release/${{ steps.module-info.outputs.install_directory }}"
+            cp "${{ steps.build-module.outputs.install-dir }}/${{ steps.module-info.outputs.install_directory }}${{ steps.module-info.outputs.module_name }}.dll" "release/${{ steps.module-info.outputs.install_directory }}"
+          fi
+          
       - name: Release Binaries
         uses: Silverlan/common_actions/release_nightly_binaries@main
         with:

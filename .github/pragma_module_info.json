@@ -1,5 +1,6 @@
 {
     "name": "DaVinci Resolve Bridge",
     "module_name": "pr_davinci",
-    "install_directory": "modules/pr_davinci/"
+    "install_directory": "addons/davinci/modules/davinci/",
+    "release_directory": "addons/davinci/"
 }
