@@ -92,6 +92,12 @@ pfm.add_event_listener("OnFilmmakerLaunched", function(pm)
 								5,
 								gui.InfoBox.TYPE_ERROR
 							)
+						else
+							pfm.open_message_prompt(
+								locale.get_text("pfm_davinci_import"),
+								locale.get_text("pfm_davinci_import_project"),
+								gui.PfmPrompt.BUTTON_OK
+							)
 						end
 					end)
 				end)

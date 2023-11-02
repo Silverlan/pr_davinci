@@ -1,5 +1,6 @@
 pfm_davinci_failed_to_determine_project_location = "Failed to determine project location. Has the project been saved?"
 pfm_davinci_failed_to_generate_project = "Failed to generate DaVinci Resolve project: {}"
 pfm_davinci_import = "Import to DaVinci Resolve"
+pfm_davinci_import_project = "To import the project into DaVinci Resolved, create a new DaVinci project, then choose \"Workspace\" > \"Scripts\" > \"Import PFM Project\" from the menu bar. Any frames that have been rendered, as well as audio and render settings, should be imported automatically."
 pfm_davinci_installation_not_found = "DaVinci Resolve installation not found!"
 pfm_davinci_installation_not_found_message = "PFM was not able to locate the DaVinci Resolve installation. Do you want to install it now? By clicking \"{yes}\", you will be redirected to the DaVinci Resolve website."
