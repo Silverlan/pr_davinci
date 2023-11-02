@@ -111,8 +111,19 @@ local function import_project(pragmaRootPath, jsonFilePath)
 
 	jsonData = json.parse(contents)
 
-	frameRate = get_json_value("session", "settings", "renderSettings", "frameRate") or frameRate
+	local renderSettings = get_json_value("session", "settings", "renderSettings") or {}
+
+	frameRate = renderSettings["frameRate"] or frameRate
 	project:SetSetting("timelineFrameRate", tostring(frameRate))
+
+	if renderSettings["width"] ~= nil then
+		project:SetSetting("timelineResolutionWidth", tostring(renderSettings["width"]))
+	end
+	if renderSettings["height"] ~= nil then
+		project:SetSetting("timelineResolutionHeight", tostring(renderSettings["height"]))
+	end
+	project:SetSetting("videoCaptureCodec", "H.265")
+	project:SetSetting("videoCaptureFormat", "QuickTime")
 
 	local function time_to_frame(t)
 		return t * frameRate
