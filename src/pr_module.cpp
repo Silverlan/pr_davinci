@@ -1,6 +1,8 @@
 #include "pr_module.hpp"
 #include <pragma/lua/luaapi.h>
 #include <pragma/console/conout.h>
+#include <pragma/networkstate/networkstate.h>
+#include <pragma/lua/converters/game_type_converters_t.hpp>
 #include <luainterface.hpp>
 #include <sharedutils/util.h>
 #include <sharedutils/scope_guard.h>
@@ -8,64 +10,54 @@
 #include <filesystem>
 #include <udm.hpp>
 #pragma optimize("", off)
-static std::string get_danvinci_resolve_installation_path()
-{
-#ifdef _WIN32
-	return "C:/Program Files/Blackmagic Design/DaVinci Resolve/"; // TODO: Allow user to specify resolve executable path in PFM settings
-#else
-	static_assert(false, "Not yet implemented!");
-#endif
-}
+static std::string get_danvinci_resolve_installation_path(NetworkState &nw) { return nw.GetConVarString("pfm_davinci_resolve_executable_path"); }
 
-static std::string get_danvinci_resolve_script_path()
-{
-#ifdef _WIN32
-	return "C:/ProgramData/Blackmagic Design/DaVinci Resolve/Fusion/"; // TODO: Allow user to specify resolve executable path in PFM settings
-#else
-	static_assert(false, "Not yet implemented!");
-#endif
-}
+static std::string get_danvinci_resolve_script_path(NetworkState &nw) { return nw.GetConVarString("pfm_davinci_resolve_script_path"); }
 
-static bool install_pragma_davinci_module()
+static bool install_pragma_davinci_module(NetworkState &nw)
 {
 	namespace fs = std::filesystem;
 
 	auto assetsDir = util::Path::CreatePath(util::get_program_path()) + "addons/davinci/assets/davinci/";
-	auto scriptPath = util::Path::CreatePath(get_danvinci_resolve_script_path());
+	auto scriptPath = util::Path::CreatePath(get_danvinci_resolve_script_path(nw));
 	try {
 		std::filesystem::copy(assetsDir.GetString(), scriptPath.GetString(), std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
 		return true;
 	}
 	catch(const fs::filesystem_error &e) {
-		std::cerr << "Filesystem error: " << e.what() << std::endl;
-		// Handle the error as needed
 		return false;
 	}
-	// Copy files from "assets/" to "C:/ProgramData/Blackmagic Design/DaVinci Resolve/Fusion/Scripts"
 	return false;
 }
 
-static bool generate_davinci_project(const std::string &projectFileName)
+namespace davinci {
+	enum class DaVinciErrorCode : uint32_t {
+		Success = 0,
+		FailedToInstallPFMModule,
+		FailedToLoadPFMProject,
+		FailedToLaunchDaVinci,
+		FailedToWriteTempJsonProject,
+		FailedToWriteDaVinciImportScript,
+
+		Count,
+	};
+};
+
+static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, const std::string &projectFileName)
 {
-	if(!install_pragma_davinci_module())
-		return false;
+	if(!install_pragma_davinci_module(nw))
+		return davinci::DaVinciErrorCode::FailedToInstallPFMModule;
 	auto udmData = udm::Data::Load(projectFileName);
 	if(!udmData)
-		return false;
+		return davinci::DaVinciErrorCode::FailedToLoadPFMProject;
 
-	std::string davinciInstallationPath = get_danvinci_resolve_installation_path();
-	std::string davinciExecutablePath = davinciInstallationPath;
-#ifdef _WIN32
-	davinciExecutablePath += "Resolve.exe";
-#else
-	static_assert(false, "Not yet implemented!");
-#endif
+	std::string davinciExecutablePath = get_danvinci_resolve_installation_path(nw);
 
 	// davinciExecutablePath += " -nogui";
 	uint32_t exitCode;
 	auto success = util::start_process(davinciExecutablePath.c_str(), true);
 	if(!success)
-		return false;
+		return davinci::DaVinciErrorCode::FailedToLaunchDaVinci;
 
 	std::stringstream ssJson;
 	udm::to_json(udmData->GetAssetData().GetData(), ssJson);
@@ -74,10 +66,10 @@ static bool generate_davinci_project(const std::string &projectFileName)
 	// We need to convert the UDM project data to JSON, so we can load it in the davinci script
 	std::string jsonFilePath = "temp/davinci_target_project.json";
 	if(!filemanager::write_file(jsonFilePath, ssJson.str()))
-		return false;
+		return davinci::DaVinciErrorCode::FailedToWriteTempJsonProject;
 	// util::ScopeGuard sgJson {[&jsonFilePath]() { filemanager::remove_file(jsonFilePath); }};
 
-	auto scriptPath = get_danvinci_resolve_script_path();
+	auto scriptPath = get_danvinci_resolve_script_path(nw);
 	// .scriptlib are automatically loaded on startup, which would be ideal in our case,
 	// unfortunately DaVinci Resolve is not fully initialized at that time, which can cause crashes and
 	// instability when trying to run the script.
@@ -89,7 +81,7 @@ static bool generate_davinci_project(const std::string &projectFileName)
 	// util::ScopeGuard sgDavinciScript {[&scriptFileLocation]() { filemanager::remove_system_file(scriptFileLocation); }};
 	auto f = filemanager::open_system_file(scriptFileLocation, filemanager::FileMode::Write);
 	if(!f)
-		return false;
+		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
 	auto programPath = util::Path::CreatePath(util::get_program_path()).GetString();
 	std::stringstream ss;
 	ss << "require(\"pragma\")\n\n";
@@ -107,7 +99,7 @@ static bool generate_davinci_project(const std::string &projectFileName)
 	ss << "os.remove(\"" << (util::Path::CreatePath(util::get_program_path()) + jsonFilePath).GetString() << "\")\n";
 	f->WriteString(ss.str());
 	f = nullptr;
-	return true;
+	return davinci::DaVinciErrorCode::Success;
 }
 
 extern "C" {
@@ -126,13 +118,26 @@ DLLEXPORT void pragma_detach() { Con::cout << "Custom module \"pr_davinci\" is a
 // Lua bindings can be initialized here
 DLLEXPORT void pragma_initialize_lua(Lua::Interface &lua)
 {
-	auto &libDemo = lua.RegisterLibrary("davinci");
-	libDemo[luabind::def("generate_project", &generate_davinci_project)];
+	auto &libDavinci = lua.RegisterLibrary("davinci");
+	libDavinci[luabind::def("generate_project", &generate_davinci_project)];
+	libDavinci[luabind::def(
+	  "is_installed", +[](NetworkState &nw) {
+		  auto exePath = get_danvinci_resolve_installation_path(nw);
+		  return filemanager::exists_system(exePath);
+	  })];
+	libDavinci[luabind::def(
+	  "result_to_string", +[](davinci::DaVinciErrorCode err) { return std::string {magic_enum::enum_name(err)}; })];
 
-	struct DemoClass {
-		DemoClass() {}
-		void PrintWarning(const std::string &msg) { Con::cwar << msg << Con::endl; }
-	};
+	Lua::RegisterLibraryEnums(lua.GetState(), "davinci",
+	  {
+	    {"RESULT_SUCCESS", umath::to_integral(davinci::DaVinciErrorCode::Success)},
+	    {"RESULT_FAILED_TO_INSTALL_PFM_MODULE", umath::to_integral(davinci::DaVinciErrorCode::FailedToInstallPFMModule)},
+	    {"RESULT_FAILED_TO_LOAD_PFM_PROJECT", umath::to_integral(davinci::DaVinciErrorCode::FailedToLoadPFMProject)},
+	    {"RESULT_FAILED_TO_LAUNCH_DAVINCI", umath::to_integral(davinci::DaVinciErrorCode::FailedToLaunchDaVinci)},
+	    {"RESULT_FAILED_TO_WRITE_TEMP_JSON_PROJECT", umath::to_integral(davinci::DaVinciErrorCode::FailedToWriteTempJsonProject)},
+	    {"RESULT_FAILED_TO_WRITE_DAVINCI_IMPORT_SCRIPT", umath::to_integral(davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript)},
+	    {"RESULT_COUNT", umath::to_integral(davinci::DaVinciErrorCode::Count)},
+	  });
 }
 
 // Called when the Lua state is about to be closed.
