@@ -42,8 +42,6 @@ local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 					local timeFrame = (audioClip ~= nil) and audioClip["timeFrame"] or nil
 					if sound ~= nil and timeFrame ~= nil then
 						local soundName = sound["soundName"]
-						soundName = soundName:gsub("\\", "/")
-						print("soundName: ", soundName)
 
 						local start = timeFrame["start"]
 						local duration = timeFrame["duration"]
@@ -73,17 +71,58 @@ local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 	return audioItems
 end
 
-local function import_frames(project)
-	local renderRootPath = "F:/projects/pragma/build_winx64/install/addons/filmmaker/render/new_project/shot1/"
-	local startFrame = 2
-	local endFrame = 73
-
-	local tFrames = {}
-	for i = startFrame, endFrame do
-		local path = renderRootPath .. "frame" .. string.rep("0", 4 - string.len(i)) .. i .. ".png"
-		table.insert(tFrames, path)
+local function file_exists(name)
+	local f = io.open(name, "r")
+	if f ~= nil then
+		io.close(f)
+		return true
+	else
+		return false
 	end
-	return project:GetMediaPool():ImportMedia(tFrames)
+end
+
+local function round(v)
+	return math.floor(v + 0.5)
+end
+
+local function import_frames(project, pragmaRootPath, jsonData, frameRate)
+	local pfmPath = pragmaRootPath .. "addons/filmmaker/"
+	local session = jsonData["session"]
+	local tFrames = {}
+	local frameIndices = {}
+	for _, clip in ipairs(session["clips"]) do
+		local clipName = clip["name"]
+		local filmTrackGroup
+		for _, trackGroup in ipairs(clip["trackGroups"]) do
+			if trackGroup["name"] == "subClipTrackGroup" then
+				filmTrackGroup = trackGroup
+				break
+			end
+		end
+		if filmTrackGroup ~= nil then
+			for _, track in ipairs(filmTrackGroup["tracks"] or {}) do
+				for _, filmClip in ipairs(track["filmClips"] or {}) do
+					local filmClipName = filmClip["name"]
+					local renderRootPath = pfmPath .. "render/" .. clipName .. "/" .. filmClipName .. "/"
+					local timeFrame = filmClip["timeFrame"]
+					local duration = timeFrame["duration"]
+					local start = timeFrame["start"]
+
+					local startFrame = 1
+					local endFrame = math.ceil(duration * frameRate)
+					for i = startFrame, endFrame do
+						-- TODO: Check all supported file extensions
+						local path = renderRootPath .. "frame" .. string.rep("0", 4 - string.len(i)) .. i .. ".png"
+						if file_exists(path) then
+							table.insert(tFrames, path)
+							table.insert(frameIndices, round(start * frameRate) + (i - 1))
+						end
+					end
+				end
+			end
+		end
+	end
+	return project:GetMediaPool():ImportMedia(tFrames), frameIndices
 end
 
 local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath)
@@ -144,8 +183,8 @@ local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath
 		return t * frameRate
 	end
 
-	local mediaPoolItems = import_frames(project)
-	local timeline = project:GetMediaPool():CreateTimelineFromClips("test", mediaPoolItems)
+	local mediaPoolItems, frameIndices = import_frames(project, pragmaRootPath, jsonData, frameRate)
+	local timeline = project:GetMediaPool():CreateTimelineFromClips("pfm_animation", mediaPoolItems)
 	if timeline == nil then
 		return false, "Failed to create timeline!"
 	end
@@ -155,8 +194,8 @@ local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath
 		local startFrame = time_to_frame(itemData.start)
 		project:GetMediaPool():AppendToTimeline({
 			{
-				["startFrame"] = startFrame,
-				["endFrame"] = startFrame + time_to_frame(itemData.duration),
+				-- ["startFrame"] = startFrame,
+				-- ["endFrame"] = startFrame + time_to_frame(itemData.duration),
 				["mediaPoolItem"] = itemData.audioItem,
 				["mediaType"] = 2, -- Audio
 			},
