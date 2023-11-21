@@ -24,7 +24,7 @@ local function dump(o)
 end
 
 local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
-	local audioItems = {}
+	local audioTimelines = {}
 	local session = jsonData["session"]
 	for _, clip in ipairs(session["clips"]) do
 		local soundTrackGroup
@@ -36,7 +36,8 @@ local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 		end
 		if soundTrackGroup ~= nil then
 			for _, track in ipairs(soundTrackGroup["tracks"] or {}) do
-				-- TODO: Add new audio clip with track["name"]
+				local trackName = track["name"]
+				local audioItems = {}
 				for _, audioClip in ipairs(track["audioClips"] or {}) do
 					local sound = (audioClip ~= nil) and audioClip["sound"] or nil
 					local timeFrame = (audioClip ~= nil) and audioClip["timeFrame"] or nil
@@ -51,7 +52,15 @@ local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 
 						local soundPath = jsonAudioMapData[soundName]
 						if soundPath ~= nil then
-							print("Importing audio file '" .. soundPath .. "'!")
+							print(
+								"Importing audio file '"
+									.. soundPath
+									.. "' with start time "
+									.. start
+									.. " and duration "
+									.. duration
+									.. "!"
+							)
 							local audioItem = project:GetMediaPool():ImportMedia(pragmaRootPath .. soundPath)
 							if audioItem[1] ~= nil then
 								table.insert(audioItems, {
@@ -65,10 +74,20 @@ local function import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
 						end
 					end
 				end
+				if #audioItems > 0 then
+					table.insert(audioTimelines, {
+						name = trackName,
+						audioItems = audioItems,
+					})
+					table.insert(audioTimelines, {
+						name = trackName .. "_2",
+						audioItems = audioItems,
+					})
+				end
 			end
 		end
 	end
-	return audioItems
+	return audioTimelines
 end
 
 local function file_exists(name)
@@ -85,11 +104,31 @@ local function round(v)
 	return math.floor(v + 0.5)
 end
 
+local function get_null_frame_path(pragmaRootPath)
+	return pragmaRootPath .. "addons/davinci/assets/davinci/null_frames/frame%04d.png"
+end
+
+local nullAudioItem
+local nullAudioItemInitialized = false
+local function get_null_audio(pragmaRootPath, project)
+	if nullAudioItemInitialized then
+		return nullAudioItem
+	end
+	nullAudioItemInitialized = true
+	nullAudioItem = project:GetMediaPool():ImportMedia(pragmaRootPath .. "addons/davinci/assets/davinci/null.mp3")
+	if nullAudioItem[1] ~= nil then
+		nullAudioItem = nullAudioItem[1]
+	else
+		nullAudioItem = nil
+	end
+	return nullAudioItem
+end
+
 local function import_frames(project, pragmaRootPath, jsonData, frameRate)
 	local pfmPath = pragmaRootPath .. "addons/filmmaker/"
 	local session = jsonData["session"]
+	local nullPath = get_null_frame_path(pragmaRootPath)
 	local tFrames = {}
-	local frameIndices = {}
 	for _, clip in ipairs(session["clips"]) do
 		local clipName = clip["name"]
 		local filmTrackGroup
@@ -108,21 +147,64 @@ local function import_frames(project, pragmaRootPath, jsonData, frameRate)
 					local duration = timeFrame["duration"]
 					local start = timeFrame["start"]
 
+					local path = renderRootPath .. "frame%04d.png"
 					local startFrame = 1
 					local endFrame = math.ceil(duration * frameRate)
-					for i = startFrame, endFrame do
-						-- TODO: Check all supported file extensions
-						local path = renderRootPath .. "frame" .. string.rep("0", 4 - string.len(i)) .. i .. ".png"
-						if file_exists(path) then
-							table.insert(tFrames, path)
-							table.insert(frameIndices, round(start * frameRate) + (i - 1))
+					local frameStart = {
+						["effective"] = nil,
+						["null"] = nil,
+					}
+					local function update_frames(identifier, path, startFrame, endFrame)
+						if startFrame == nil then
+							return
+						end
+						local items = project:GetMediaPool():ImportMedia({
+							{
+								["FilePath"] = path,
+								["StartIndex"] = startFrame,
+								["EndIndex"] = endFrame,
+							},
+						})
+						if items ~= nil then
+							for _, item in ipairs(items) do
+								table.insert(tFrames, item)
+							end
+						end
+						frameStart[identifier] = nil
+					end
+					local function update_effective_frames(endFrame)
+						return update_frames("effective", path, frameStart["effective"], endFrame)
+					end
+					local function update_null_frames(endFrame)
+						if frameStart["null"] == nil then
+							return
+						end
+						local startFrame = 1
+						local endFrame = (endFrame - frameStart["null"]) + 1
+						local numFrames = (endFrame - startFrame) + 1
+						while numFrames > 0 do
+							local numFramesClamped = math.min(numFrames, 100)
+							update_frames("null", nullPath, startFrame, (startFrame + numFramesClamped) - 1)
+							numFrames = numFrames - numFramesClamped
 						end
 					end
+					for i = startFrame, endFrame do
+						local framePath = string.format(path, i)
+						if not file_exists(framePath) then
+							update_effective_frames(i - 1)
+							frameStart["null"] = frameStart["null"] or i
+						else
+							update_null_frames(i - 1)
+							frameStart["effective"] = frameStart["effective"] or i
+						end
+					end
+					update_null_frames(endFrame)
+					update_effective_frames(endFrame)
 				end
 			end
 		end
 	end
-	return project:GetMediaPool():ImportMedia(tFrames), frameIndices
+	return tFrames
 end
 
 local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath)
@@ -182,24 +264,68 @@ local function import_project(pragmaRootPath, jsonFilePath, jsonAudioMapFilePath
 	local function time_to_frame(t)
 		return t * frameRate
 	end
+	local function frame_to_time(frame)
+		return frame / frameRate
+	end
 
-	local mediaPoolItems, frameIndices = import_frames(project, pragmaRootPath, jsonData, frameRate)
+	local mediaPoolItems = import_frames(project, pragmaRootPath, jsonData, frameRate)
 	local timeline = project:GetMediaPool():CreateTimelineFromClips("pfm_animation", mediaPoolItems)
 	if timeline == nil then
 		return false, "Failed to create timeline!"
 	end
 
-	local audioItems = import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
-	for _, itemData in ipairs(audioItems) do
-		local startFrame = time_to_frame(itemData.start)
+	local nullAudioItem = get_null_audio(pragmaRootPath, project)
+	local trackLastFrame = {}
+	local function add_audio_item(trackIndex, audioItem, startFrame, endFrame, isNull, soundStartOffset, soundDuration)
+		local lastFrame = trackLastFrame[trackIndex] or -1
+		if startFrame > lastFrame + 1 then
+			local frame = lastFrame + 1
+			if nullAudioItem ~= nil then
+				local nullEndFrame = startFrame - 1
+				local nullNumFrames = (nullEndFrame - frame) + 1
+				add_audio_item(trackIndex, nullAudioItem, frame, nullEndFrame, true, 0, frame_to_time(nullNumFrames))
+			else
+				print("Unable to insert NULL audio!")
+			end
+		end
+		print(
+			"Adding "
+				.. (isNull and "NULL " or "")
+				.. "audio item '"
+				.. tostring(audioItem)
+				.. "' to range ["
+				.. startFrame
+				.. ","
+				.. endFrame
+				.. "] in track "
+				.. trackIndex
+				.. "..."
+		)
 		project:GetMediaPool():AppendToTimeline({
 			{
-				-- ["startFrame"] = startFrame,
-				-- ["endFrame"] = startFrame + time_to_frame(itemData.duration),
-				["mediaPoolItem"] = itemData.audioItem,
+				["startFrame"] = time_to_frame(soundStartOffset),
+				["endFrame"] = time_to_frame(soundStartOffset + soundDuration),
+				["mediaPoolItem"] = audioItem,
 				["mediaType"] = 2, -- Audio
+				["trackIndex"] = trackIndex,
 			},
 		})
+		trackLastFrame[trackIndex] = endFrame
+	end
+
+	local audioTimelines = import_audio(project, pragmaRootPath, jsonData, jsonAudioMapData)
+	local timeline = project:GetCurrentTimeline()
+	for trackIndex, timelineData in ipairs(audioTimelines) do
+		if timeline:GetTrackCount("audio") < trackIndex then
+			timeline:AddTrack("audio", "stereo")
+		end
+		timeline:SetTrackName("audio", trackIndex, timelineData.name)
+		for _, itemData in ipairs(timelineData.audioItems) do
+			local startTime = itemData.start
+			local startFrame = time_to_frame(startTime)
+			local endFrame = time_to_frame(startTime + itemData.duration)
+			add_audio_item(trackIndex, itemData.audioItem, startFrame, endFrame, false, 0, itemData.duration)
+		end
 	end
 
 	return true
