@@ -35,33 +35,6 @@ console.register_variable(
 	'The path to the DaVinci Resolve "Fusion" script location.'
 )
 
-local function find_sound_file_path(snd)
-	local filePath = asset.find_file(snd, asset.TYPE_AUDIO)
-	if filePath == nil then
-		return
-	end
-	return file.find_absolute_path(asset.get_asset_root_directory(asset.TYPE_AUDIO) .. "/" .. filePath)
-end
-
-local function generate_audio_file_map(session)
-	local sndMap = {}
-	for _, clip in ipairs(session:GetClips()) do
-		for _, trackGroup in ipairs(clip:GetTrackGroups()) do
-			if trackGroup:GetName() == "Sound" then
-				for _, track in ipairs(trackGroup:GetTracks()) do
-					for _, audioClip in ipairs(track:GetAudioClips()) do
-						local sound = audioClip:GetSound()
-						sound = sound:GetSoundName()
-						sound = sound:gsub("\\\\", "/")
-						sndMap[sound] = sndMap[sound] or find_sound_file_path(sound)
-					end
-				end
-			end
-		end
-	end
-	return sndMap
-end
-
 pfm.add_event_listener("OnFilmmakerLaunched", function(pm)
 	pm:AddEventListener("OnWindowOpened", function(pm, identifier, el)
 		if identifier == "render" then
@@ -103,10 +76,20 @@ pfm.add_event_listener("OnFilmmakerLaunched", function(pm)
 							)
 							return
 						end
+						if pfm.util.export_xml_timeline == nil then
+							pfm.log(
+								"DaVinci addon has not been loaded!",
+								pfm.LOG_CATEGORY_PFM,
+								pfm.LOG_SEVERITY_WARNING
+							)
+							return
+						end
 						pfm.log("Generating DaVinci Resolve project...", pfm.LOG_CATEGORY_PFM)
 
-						local sndMap = generate_audio_file_map(pm:GetSession())
-						local res = davinci.generate_project(path, json.stringify(sndMap))
+						file.create_path("temp")
+						local timelineXmlPath = "temp/pfm_davinci_timeline.fcpxml"
+						pfm.util.export_xml_timeline(pm, timelineXmlPath)
+						local res = davinci.generate_project(timelineXmlPath)
 						pfm.log(
 							"Result: " .. davinci.result_to_string(res),
 							pfm.LOG_CATEGORY_PFM,
