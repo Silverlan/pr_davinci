@@ -41,7 +41,7 @@ pfm.add_event_listener("OnFilmmakerLaunched", function(pm)
 			local miscOptionsButton = el:GetMiscOptionsButton()
 			if util.is_valid(miscOptionsButton) then
 				miscOptionsButton:AddEventListener("PopulateContextMenu", function(miscOptionsButton, pContext)
-					pContext:AddItem(locale.get_text("pfm_davinci_import"), function()
+					local pItem = pContext:AddItem(locale.get_text("pfm_davinci_import"), function()
 						local r = engine.load_library("davinci/pr_davinci")
 						if r ~= true then
 							pfm.create_popup_message("Failed to load davinci module: " .. r, 5, gui.InfoBox.TYPE_ERROR)
@@ -112,6 +112,7 @@ pfm.add_event_listener("OnFilmmakerLaunched", function(pm)
 							)
 						end
 					end)
+					pItem:SetName("import_to_davinci")
 				end)
 			end
 		end
