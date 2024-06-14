@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.12)
-
-include("./CMakeShared.txt")
+include(${CMAKE_SOURCE_DIR}/cmake/pr_common.cmake)
 
 set(PROJ_NAME pr_davinci)
+pr_add_library(${PROJ_NAME} SHARED)
 
-project(${PROJ_NAME} CXX)
+pr_add_dependency(${PROJ_NAME} shared TARGET PUBLIC)
 
-link_generic_module_libraries()
-register_pragma_module(${PROJ_NAME})
+pr_add_headers(${PROJ_NAME} "include/")
+pr_add_sources(${PROJ_NAME} "src/")
+
+pr_finalize(${PROJ_NAME})
