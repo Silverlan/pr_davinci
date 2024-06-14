@@ -7,10 +7,9 @@
 #include <sharedutils/util.h>
 #include <sharedutils/scope_guard.h>
 #include <sharedutils/magic_enum.hpp>
+#include <udm.hpp>
 #include <fsys/filesystem.h>
 #include <filesystem>
-
-import udm;
 
 #pragma optimize("", off)
 static std::string get_danvinci_resolve_installation_path(NetworkState &nw) { return nw.GetConVarString("pfm_davinci_resolve_executable_path"); }
