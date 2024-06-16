@@ -1,3 +1,0 @@
-# Install the library
-pragma_install_lib("${CMAKE_CURRENT_BINARY_DIR}/modules/pr_davinci/${PR_MODULE_INSTALL_SUBDIR}/${OS_LIB_BIN_PRE}pr_davinci${OS_LIB_BIN_EXT}" "addons/davinci/modules/davinci/")
-pragma_install_directory("${CMAKE_CURRENT_LIST_DIR}/assets/" "addons/davinci/")
