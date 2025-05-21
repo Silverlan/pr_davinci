@@ -31,7 +31,10 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 {
 	std::string davinciExecutablePath = get_danvinci_resolve_installation_path(nw);
 	uint32_t exitCode;
-	auto success = util::start_process(davinciExecutablePath.c_str(), true);
+	util::CommandInfo cmdInfo;
+	cmdInfo.command = davinciExecutablePath;
+	cmdInfo.absoluteCommandPath = true;
+	auto success = util::start_process(cmdInfo);
 	if(!success)
 		return davinci::DaVinciErrorCode::FailedToLaunchDaVinci;
 
@@ -91,8 +94,7 @@ DLLEXPORT void pragma_initialize_lua(Lua::Interface &lua)
 		  auto exePath = get_danvinci_resolve_installation_path(nw);
 		  return filemanager::exists_system(exePath);
 	  })];
-	libDavinci[luabind::def(
-	  "result_to_string", +[](davinci::DaVinciErrorCode err) { return std::string {magic_enum::enum_name(err)}; })];
+	libDavinci[luabind::def("result_to_string", +[](davinci::DaVinciErrorCode err) { return std::string {magic_enum::enum_name(err)}; })];
 
 	Lua::RegisterLibraryEnums(lua.GetState(), "davinci",
 	  {
