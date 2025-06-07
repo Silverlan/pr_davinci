@@ -47,7 +47,6 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 	auto f = filemanager::open_system_file(scriptFileLocation, filemanager::FileMode::Write);
 	if(!f)
 		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
-	auto programPath = util::Path::CreatePath(util::get_program_path()).GetString();
 
 	std::stringstream ss;
 	ss << R"(
