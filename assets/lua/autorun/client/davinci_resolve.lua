@@ -10,29 +10,20 @@ include("/pfm/events.lua")
 
 locale.load("davinci.txt")
 
-local defaultExecutablePath
-local defaultScriptPath
-if os.SYSTEM_WINDOWS then
-	defaultExecutablePath = "C:/Program Files/Blackmagic Design/DaVinci Resolve/Resolve.exe"
-	defaultScriptPath = "C:/ProgramData/Blackmagic Design/DaVinci Resolve/Fusion/"
-else
-	defaultExecutablePath = "/opt/resolve/bin/resolve"
-	defaultScriptPath = "/opt/resolve/Fusion/"
-end
 console.register_variable(
 	"pfm_davinci_resolve_executable_path",
 	udm.TYPE_STRING,
-	defaultExecutablePath,
+	"",
 	bit.bor(console.FLAG_BIT_ARCHIVE),
-	"The path to the executable for DaVinci Resolve, including the filename."
+	"The path to the executable for DaVinci Resolve, including the filename. Leave empty for default behavior."
 )
 
 console.register_variable(
 	"pfm_davinci_resolve_script_path",
 	udm.TYPE_STRING,
-	defaultScriptPath,
+	"",
 	bit.bor(console.FLAG_BIT_ARCHIVE),
-	'The path to the DaVinci Resolve "Fusion" script location.'
+	'The path to the DaVinci Resolve "Fusion" script location. Leave empty for default behavior.'
 )
 
 pfm.add_event_listener("OnFilmmakerLaunched", function(pm)

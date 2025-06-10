@@ -11,10 +11,40 @@
 #include <fsys/filesystem.h>
 #include <filesystem>
 
-#pragma optimize("", off)
-static std::string get_danvinci_resolve_installation_path(NetworkState &nw) { return nw.GetConVarString("pfm_davinci_resolve_executable_path"); }
+static std::string get_danvinci_resolve_installation_path(NetworkState &nw)
+{
+	auto exePath = nw.GetConVarString("pfm_davinci_resolve_executable_path");
+	if(!exePath.empty())
+		return exePath;
+#ifdef _WIN32
+	return "C:/Program Files/Blackmagic Design/DaVinci Resolve/Resolve.exe";
+#else
+	return "/opt/resolve/bin/resolve";
+#endif
+}
 
-static std::string get_danvinci_resolve_script_path(NetworkState &nw) { return nw.GetConVarString("pfm_davinci_resolve_script_path"); }
+static std::string get_danvinci_resolve_script_path(NetworkState &nw)
+{
+	auto scriptPath = nw.GetConVarString("pfm_davinci_resolve_script_path");
+	if(!scriptPath.empty())
+		return scriptPath;
+#ifdef _WIN32
+	return "C:/ProgramData/Blackmagic Design/DaVinci Resolve/Fusion/";
+#else
+	std::vector<util::Path> candidates;
+	candidates.reserve(3);
+	auto home = util::get_env_variable("HOME");
+	if(home)
+		candidates.push_back(util::DirPath(*home, ".local/share/DaVinciResolve/Fusion"));
+	candidates.push_back(util::DirPath("/opt/resolve/Fusion"));
+	candidates.push_back(util::DirPath("/home/resolve/Fusion"));
+	for(auto &candidate : candidates) {
+		if(filemanager::exists_system(candidate.GetString()))
+			return candidate.GetString();
+	}
+	return {};
+#endif
+}
 
 namespace davinci {
 	enum class DaVinciErrorCode : uint32_t {
@@ -43,7 +73,10 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 		return davinci::DaVinciErrorCode::FailedToLocateTimelineFile;
 
 	auto scriptPath = get_danvinci_resolve_script_path(nw);
-	std::string scriptFileLocation = scriptPath + "Scripts/Utility/Import PFM Project.lua";
+	if(scriptPath.empty())
+		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
+
+	std::string scriptFileLocation = util::FilePath(scriptPath, "Scripts/Utility/Import PFM Project.lua").GetString();
 	auto f = filemanager::open_system_file(scriptFileLocation, filemanager::FileMode::Write);
 	if(!f)
 		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
@@ -76,12 +109,15 @@ DLLEXPORT bool pragma_attach(std::string &outErr)
 {
 	// Return true to indicate that the module has been loaded successfully.
 	// If the module could not be loaded properly, return false and populate 'outErr' with a descriptive error message.
-	Con::cout << "Custom module \"pr_davinci\" has been loaded!" << Con::endl;
+	// Con::cout << "Custom module \"pr_davinci\" has been loaded!" << Con::endl;
 	return true;
 }
 
 // Called when the module is about to be unloaded
-DLLEXPORT void pragma_detach() { Con::cout << "Custom module \"pr_davinci\" is about to be unloaded!" << Con::endl; }
+DLLEXPORT void pragma_detach()
+{
+	// Con::cout << "Custom module \"pr_davinci\" is about to be unloaded!" << Con::endl;
+}
 
 // Lua bindings can be initialized here
 DLLEXPORT void pragma_initialize_lua(Lua::Interface &lua)
