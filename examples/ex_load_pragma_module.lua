@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: (c) 2023 Silverlan <opensource@pragma-engine.com>
+// SPDX-License-Identifier: MIT
+
 -- Example Lua script for loading the module.
 -- To run this script, copy the Lua-file to "pragma/lua", then start a new game and run the following console command (without quotes):
 -- "lua_exec_cl ex_load_pragma_module.lua"

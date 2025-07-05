@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: (c) 2023 Silverlan <opensource@pragma-engine.com>
+// SPDX-License-Identifier: MIT
+
 #include "pr_module.hpp"
 #include <pragma/lua/luaapi.h>
 #include <pragma/console/conout.h>

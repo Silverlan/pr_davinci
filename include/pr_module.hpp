@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: (c) 2023 Silverlan <opensource@pragma-engine.com>
+// SPDX-License-Identifier: MIT
+
 #ifndef __PR_MODULE_HPP__
 #define __PR_MODULE_HPP__
 
