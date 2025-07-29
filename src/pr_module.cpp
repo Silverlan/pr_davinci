@@ -67,6 +67,13 @@ static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, cons
 	util::CommandInfo cmdInfo;
 	cmdInfo.command = davinciExecutablePath;
 	cmdInfo.absoluteCommandPath = true;
+
+	// Note: This does not work in a flatpak sandbox.
+	// We could use
+	// system("flatpak-spawn --host /opt/resolve/bin/resolve");
+	// to launch DaVinci Resolve, but that would require
+	// --talk-name=org.freedesktop.Flatpak
+	// permissions.
 	auto success = util::start_process(cmdInfo);
 	if(!success)
 		return davinci::DaVinciErrorCode::FailedToLaunchDaVinci;
