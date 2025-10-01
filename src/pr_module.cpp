@@ -3,9 +3,6 @@
 
 #include "pr_module.hpp"
 #include <pragma/lua/luaapi.h>
-#include <pragma/console/conout.h>
-#include <pragma/networkstate/networkstate.h>
-#include <pragma/lua/converters/game_type_converters_t.hpp>
 #include <luainterface.hpp>
 #include <sharedutils/util.h>
 #include <sharedutils/scope_guard.h>
@@ -13,6 +10,8 @@
 #include <udm.hpp>
 #include <fsys/filesystem.h>
 #include <filesystem>
+
+import pragma.shared;
 
 static std::string get_danvinci_resolve_installation_path(NetworkState &nw)
 {
