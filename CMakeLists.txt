@@ -5,7 +5,6 @@ pr_add_module(${PROJ_NAME} SHARED "addons/davinci/modules/davinci/")
 
 pr_add_dependency(${PROJ_NAME} shared TARGET PUBLIC)
 
-pr_add_headers(${PROJ_NAME} "include/")
-pr_add_sources(${PROJ_NAME} "src/")
+pr_init_module(${PROJ_NAME})
 
 pr_finalize(${PROJ_NAME})
