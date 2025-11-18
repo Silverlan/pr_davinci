@@ -1,18 +1,7 @@
 // SPDX-FileCopyrightText: (c) 2023 Silverlan <opensource@pragma-engine.com>
 // SPDX-License-Identifier: MIT
 
-#include "pr_module.hpp"
-#include <pragma/lua/luaapi.h>
-#include <pragma/console/conout.h>
-#include <pragma/networkstate/networkstate.h>
-#include <pragma/lua/converters/game_type_converters_t.hpp>
-#include <luainterface.hpp>
-#include <sharedutils/util.h>
-#include <sharedutils/scope_guard.h>
-#include <sharedutils/magic_enum.hpp>
-#include <udm.hpp>
-#include <fsys/filesystem.h>
-#include <filesystem>
+import pragma.shared;
 
 static std::string get_danvinci_resolve_installation_path(NetworkState &nw)
 {
@@ -115,7 +104,7 @@ end
 
 extern "C" {
 // Called after the module has been loaded
-DLLEXPORT bool pragma_attach(std::string &outErr)
+PR_EXPORT bool pragma_attach(std::string &outErr)
 {
 	// Return true to indicate that the module has been loaded successfully.
 	// If the module could not be loaded properly, return false and populate 'outErr' with a descriptive error message.
@@ -124,13 +113,13 @@ DLLEXPORT bool pragma_attach(std::string &outErr)
 }
 
 // Called when the module is about to be unloaded
-DLLEXPORT void pragma_detach()
+PR_EXPORT void pragma_detach()
 {
 	// Con::cout << "Custom module \"pr_davinci\" is about to be unloaded!" << Con::endl;
 }
 
 // Lua bindings can be initialized here
-DLLEXPORT void pragma_initialize_lua(Lua::Interface &lua)
+PR_EXPORT void pragma_initialize_lua(Lua::Interface &lua)
 {
 	auto &libDavinci = lua.RegisterLibrary("davinci");
 	libDavinci[luabind::def("generate_project", &generate_davinci_project)];
@@ -152,5 +141,5 @@ DLLEXPORT void pragma_initialize_lua(Lua::Interface &lua)
 }
 
 // Called when the Lua state is about to be closed.
-DLLEXPORT void pragma_terminate_lua(Lua::Interface &lua) {}
+PR_EXPORT void pragma_terminate_lua(Lua::Interface &lua) {}
 };
