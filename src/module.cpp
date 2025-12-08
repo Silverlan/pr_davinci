@@ -3,7 +3,7 @@
 
 import pragma.shared;
 
-static std::string get_danvinci_resolve_installation_path(NetworkState &nw)
+static std::string get_danvinci_resolve_installation_path(pragma::NetworkState &nw)
 {
 	auto exePath = nw.GetConVarString("pfm_davinci_resolve_executable_path");
 	if(!exePath.empty())
@@ -15,7 +15,7 @@ static std::string get_danvinci_resolve_installation_path(NetworkState &nw)
 #endif
 }
 
-static std::string get_danvinci_resolve_script_path(NetworkState &nw)
+static std::string get_danvinci_resolve_script_path(pragma::NetworkState &nw)
 {
 	auto scriptPath = nw.GetConVarString("pfm_davinci_resolve_script_path");
 	if(!scriptPath.empty())
@@ -49,7 +49,7 @@ namespace davinci {
 	};
 };
 
-static davinci::DaVinciErrorCode generate_davinci_project(NetworkState &nw, const std::string &timelineXmlPath)
+static davinci::DaVinciErrorCode generate_davinci_project(pragma::NetworkState &nw, const std::string &timelineXmlPath)
 {
 	std::string davinciExecutablePath = get_danvinci_resolve_installation_path(nw);
 	uint32_t exitCode;
@@ -124,7 +124,7 @@ PR_EXPORT void pragma_initialize_lua(Lua::Interface &lua)
 	auto &libDavinci = lua.RegisterLibrary("davinci");
 	libDavinci[luabind::def("generate_project", &generate_davinci_project)];
 	libDavinci[luabind::def(
-	  "is_installed", +[](NetworkState &nw) {
+	  "is_installed", +[](pragma::NetworkState &nw) {
 		  auto exePath = get_danvinci_resolve_installation_path(nw);
 		  return filemanager::exists_system(exePath);
 	  })];
