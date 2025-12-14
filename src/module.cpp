@@ -23,15 +23,15 @@ static std::string get_danvinci_resolve_script_path(pragma::NetworkState &nw)
 #ifdef _WIN32
 	return "C:/ProgramData/Blackmagic Design/DaVinci Resolve/Fusion/";
 #else
-	std::vector<util::Path> candidates;
+	std::vector<pragma::util::Path> candidates;
 	candidates.reserve(3);
-	auto home = util::get_env_variable("HOME");
+	auto home = pragma::util::get_env_variable("HOME");
 	if(home)
-		candidates.push_back(util::DirPath(*home, ".local/share/DaVinciResolve/Fusion"));
-	candidates.push_back(util::DirPath("/opt/resolve/Fusion"));
-	candidates.push_back(util::DirPath("/home/resolve/Fusion"));
+		candidates.push_back(pragma::util::DirPath(*home, ".local/share/DaVinciResolve/Fusion"));
+	candidates.push_back(pragma::util::DirPath("/opt/resolve/Fusion"));
+	candidates.push_back(pragma::util::DirPath("/home/resolve/Fusion"));
 	for(auto &candidate : candidates) {
-		if(filemanager::exists_system(candidate.GetString()))
+		if(pragma::fs::exists_system(candidate.GetString()))
 			return candidate.GetString();
 	}
 	return {};
@@ -53,7 +53,7 @@ static davinci::DaVinciErrorCode generate_davinci_project(pragma::NetworkState &
 {
 	std::string davinciExecutablePath = get_danvinci_resolve_installation_path(nw);
 	uint32_t exitCode;
-	util::CommandInfo cmdInfo;
+	pragma::util::CommandInfo cmdInfo;
 	cmdInfo.command = davinciExecutablePath;
 	cmdInfo.absoluteCommandPath = true;
 
@@ -63,20 +63,20 @@ static davinci::DaVinciErrorCode generate_davinci_project(pragma::NetworkState &
 	// to launch DaVinci Resolve, but that would require
 	// --talk-name=org.freedesktop.Flatpak
 	// permissions.
-	auto success = util::start_process(cmdInfo);
+	auto success = pragma::util::start_process(cmdInfo);
 	if(!success)
 		return davinci::DaVinciErrorCode::FailedToLaunchDaVinci;
 
 	std::string absTimelineXmlPath;
-	if(!FileManager::FindAbsolutePath(timelineXmlPath, absTimelineXmlPath))
+	if(!pragma::fs::find_absolute_path(timelineXmlPath, absTimelineXmlPath))
 		return davinci::DaVinciErrorCode::FailedToLocateTimelineFile;
 
 	auto scriptPath = get_danvinci_resolve_script_path(nw);
 	if(scriptPath.empty())
 		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
 
-	std::string scriptFileLocation = util::FilePath(scriptPath, "Scripts/Utility/Import PFM Project.lua").GetString();
-	auto f = filemanager::open_system_file(scriptFileLocation, filemanager::FileMode::Write);
+	std::string scriptFileLocation = pragma::util::FilePath(scriptPath, "Scripts/Utility/Import PFM Project.lua").GetString();
+	auto f = pragma::fs::open_system_file(scriptFileLocation, pragma::fs::FileMode::Write);
 	if(!f)
 		return davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript;
 
@@ -126,17 +126,17 @@ PR_EXPORT void pragma_initialize_lua(Lua::Interface &lua)
 	libDavinci[luabind::def(
 	  "is_installed", +[](pragma::NetworkState &nw) {
 		  auto exePath = get_danvinci_resolve_installation_path(nw);
-		  return filemanager::exists_system(exePath);
+		  return pragma::fs::exists_system(exePath);
 	  })];
 	libDavinci[luabind::def("result_to_string", +[](davinci::DaVinciErrorCode err) { return std::string {magic_enum::enum_name(err)}; })];
 
 	Lua::RegisterLibraryEnums(lua.GetState(), "davinci",
 	  {
-	    {"RESULT_SUCCESS", umath::to_integral(davinci::DaVinciErrorCode::Success)},
-	    {"RESULT_FAILED_TO_LOCATE_TIMELINE_FILE", umath::to_integral(davinci::DaVinciErrorCode::FailedToLocateTimelineFile)},
-	    {"RESULT_FAILED_TO_LAUNCH_DAVINCI", umath::to_integral(davinci::DaVinciErrorCode::FailedToLaunchDaVinci)},
-	    {"RESULT_FAILED_TO_WRITE_DAVINCI_IMPORT_SCRIPT", umath::to_integral(davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript)},
-	    {"RESULT_COUNT", umath::to_integral(davinci::DaVinciErrorCode::Count)},
+	    {"RESULT_SUCCESS", pragma::math::to_integral(davinci::DaVinciErrorCode::Success)},
+	    {"RESULT_FAILED_TO_LOCATE_TIMELINE_FILE", pragma::math::to_integral(davinci::DaVinciErrorCode::FailedToLocateTimelineFile)},
+	    {"RESULT_FAILED_TO_LAUNCH_DAVINCI", pragma::math::to_integral(davinci::DaVinciErrorCode::FailedToLaunchDaVinci)},
+	    {"RESULT_FAILED_TO_WRITE_DAVINCI_IMPORT_SCRIPT", pragma::math::to_integral(davinci::DaVinciErrorCode::FailedToWriteDaVinciImportScript)},
+	    {"RESULT_COUNT", pragma::math::to_integral(davinci::DaVinciErrorCode::Count)},
 	  });
 }
 
