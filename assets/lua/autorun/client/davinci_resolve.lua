@@ -1,7 +1,7 @@
 -- SPDX-FileCopyrightText: (c) 2023 Silverlan <opensource@pragma-engine.com>
 -- SPDX-License-Identifier: MIT
 
-include("/pfm/events.lua")
+include("/pfm/core/events.lua")
 
 locale.load("davinci.txt")
 
