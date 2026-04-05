@@ -5,7 +5,7 @@ import pragma.shared;
 
 static std::string get_danvinci_resolve_installation_path(pragma::NetworkState &nw)
 {
-	auto exePath = nw.GetConVarString("pfm_davinci_resolve_executable_path");
+	auto exePath = nw.GetConVarValueOr<udm::String>("pfm_davinci_resolve_executable_path");
 	if(!exePath.empty())
 		return exePath;
 #ifdef _WIN32
@@ -17,7 +17,7 @@ static std::string get_danvinci_resolve_installation_path(pragma::NetworkState &
 
 static std::string get_danvinci_resolve_script_path(pragma::NetworkState &nw)
 {
-	auto scriptPath = nw.GetConVarString("pfm_davinci_resolve_script_path");
+	auto scriptPath = nw.GetConVarValueOr<udm::String>("pfm_davinci_resolve_script_path");
 	if(!scriptPath.empty())
 		return scriptPath;
 #ifdef _WIN32
